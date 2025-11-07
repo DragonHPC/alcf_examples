@@ -28,20 +28,25 @@ def process_data(idx_size):
         return e
 
 
-def setup_ddict():
+def setup_ddict(needed_mb):
     # let's place the DDict across all nodes Dragon is running on
     my_system = System()
     num_nodes = my_system.nnodes
+    node_mem_frac = 0.5
+    head_room_fac = 2
 
     total_mem = 0
     for huid in my_system.nodes:
         anode = Node(huid)
         total_mem += anode.physical_mem
-    dict_mem = 0.1 * total_mem  # use 10% of the mem
-    print(f"DDict will be {dict_mem} bytes", flush=True)
+    dict_mem = min(head_room_fac * needed_mb * 1024**2, node_mem_frac * total_mem)
+    print(
+        f"DDict will be {int(dict_mem / 1024**3)} GB (needed {int(head_room_fac * needed_mb / 1024)} GB)",
+        flush=True,
+    )
 
     return DDict(
-        2,  # two managers per node
+        1,
         num_nodes,
         int(dict_mem),
     )
@@ -67,16 +72,16 @@ class DataReader:
 if __name__ == "__main__":
     set_start_method("dragon")
 
-    items_mb = 50
-    nitems = 1000
+    items_mb = 14.6
+    nitems = 500354  # 10000 * System().nnodes
     dr = DataReader(items_mb, nitems)
 
-    the_ddict = setup_ddict()
+    the_ddict = setup_ddict(items_mb * nitems)
 
     num_cores = cpu_count() // 8
 
     with Pool(num_cores, initializer=initialize_worker, initargs=(the_ddict,)) as p:
-        processed_data = p.imap_unordered(process_data, dr, 64)
+        processed_data = p.imap_unordered(process_data, dr, chunksize=64)
         for i, item in enumerate(processed_data):
             if item != True:
                 print(f"Worker caught an exception: {item}", flush=True)
