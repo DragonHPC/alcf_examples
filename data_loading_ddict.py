@@ -5,6 +5,8 @@ from pathlib import Path
 from dragon.data.ddict import DDict
 from dragon.native.machine import System, Node
 
+import sys
+
 
 def initialize_worker(the_ddict):
     # Since we want each worker to maintain a persistent handle to the DDict,
@@ -21,7 +23,17 @@ def process_data(idx_size):
     try:
         idx, size = idx_size
         k = f"some_key_{idx}"
-        v = bytearray(size)
+
+        smiles = []
+        inf_results = []
+        tot_size = 0
+        while tot_size < size:
+            smiles.append(64 * "a")
+            inf_results.append(0.0)
+            tot_size = sys.getsizeof(smiles) + sys.getsizeof(inf_results)
+
+        v = {"f_name": k, "smiles": smiles, "inf": inf_results, "model_iter": -1}
+        # v = bytearray(size)
         the_ddict[k] = v
         return True
     except Exception as e:
